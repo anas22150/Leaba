@@ -2,7 +2,8 @@ name: Build and Deploy THE LAST SURVIVOR
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,44 +12,59 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Download repository files
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare website files
+      - name: Extract game ZIP
         run: |
           set -e
           ZIP_FILE="THE-LAST-SURVIVOR-READY-TO-PUBLISH.zip"
+
           if [ ! -f "$ZIP_FILE" ]; then
-            echo "Missing $ZIP_FILE. Upload the game ZIP to the repository root."
+            echo "::error::لم يتم العثور على $ZIP_FILE في جذر المستودع."
+            echo "الملفات الموجودة:"
+            ls -la
             exit 1
           fi
+
           mkdir -p site
           unzip -q "$ZIP_FILE" -d site
-          test -f site/index.html
-          echo "Website files prepared:"
-          find site -maxdepth 2 -type f -print
+
+          if [ ! -f "site/index.html" ]; then
+            echo "::error::لم يتم العثور على index.html بعد فك الضغط."
+            echo "محتويات مجلد site:"
+            find site -maxdepth 3 -type f -print
+            exit 1
+          fi
+
+          echo "تم تجهيز ملفات الموقع:"
+          find site -maxdepth 3 -type f -print
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
 
-      - name: Upload website artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: github-pages
           path: site
+          retention-days: 1
+
+      - name: Verify uploaded artifact step
+        run: echo "تم تنفيذ خطوة رفع artifact باسم github-pages."
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        
+        with:
+          artifact_name: github-pages
+          
