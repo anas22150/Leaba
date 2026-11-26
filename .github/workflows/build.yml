@@ -6,28 +6,26 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 concurrency:
-  group: pages
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract game ZIP
+      - name: Extract game files
         run: |
           set -euo pipefail
           ZIP_FILE="THE-LAST-SURVIVOR-READY-TO-PUBLISH.zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
             echo "::error::لم يتم العثور على $ZIP_FILE في جذر المستودع."
-            echo "محتويات المستودع:"
             ls -la
             exit 1
           fi
@@ -36,13 +34,56 @@ jobs:
           unzip -q "$ZIP_FILE" -d site
 
           if [ ! -s "site/index.html" ]; then
-            echo "::error::ملف site/index.html غير موجود أو فارغ."
+            echo "::error::index.html غير موجود داخل ملف ZIP."
             find site -maxdepth 3 -type f -print
             exit 1
           fi
 
-          echo "تم تجهيز الموقع:"
-          find site -maxdepth 3 -type f -print
+      - name: Download Three.js locally
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 5 --retry-delay 2 \
+            "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" \
+            --output site/three.min.js
+
+          if [ ! -s "site/three.min.js" ]; then
+            echo "::error::فشل تنزيل ملف Three.js."
+            exit 1
+          fi
+
+          echo "Three.js size:"
+          wc -c site/three.min.js
+
+      - name: Switch game to local Three.js
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          page = Path("site/index.html")
+          html = page.read_text(encoding="utf-8")
+          cdn = "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"
+          local = "./three.min.js"
+
+          if cdn not in html:
+              if local not in html:
+                  raise SystemExit("لم أجد رابط Three.js المتوقع داخل index.html.")
+              print("الصفحة تستخدم Three.js محليًا بالفعل.")
+          else:
+              html = html.replace(cdn, local)
+              page.write_text(html, encoding="utf-8")
+              print("تم تحويل Three.js إلى الملف المحلي.")
+          PY
+
+          grep -n "three.min.js" site/index.html
+
+      - name: Verify website files
+        run: |
+          set -euo pipefail
+          test -s site/index.html
+          test -s site/three.min.js
+          echo "Files ready for publishing:"
+          find site -maxdepth 2 -type f -printf '%P (%s bytes)\n'
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -59,7 +100,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy GitHub Pages artifact
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
         
