@@ -8,31 +8,26 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: github-pages
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Extract game ZIP
         run: |
-          set -e
+          set -euo pipefail
           ZIP_FILE="THE-LAST-SURVIVOR-READY-TO-PUBLISH.zip"
 
           if [ ! -f "$ZIP_FILE" ]; then
             echo "::error::لم يتم العثور على $ZIP_FILE في جذر المستودع."
+            echo "محتويات المستودع:"
             ls -la
             exit 1
           fi
@@ -40,30 +35,31 @@ jobs:
           mkdir -p site
           unzip -q "$ZIP_FILE" -d site
 
-          if [ ! -f "site/index.html" ]; then
-            echo "::error::لم يتم العثور على index.html بعد فك الضغط."
+          if [ ! -s "site/index.html" ]; then
+            echo "::error::ملف site/index.html غير موجود أو فارغ."
             find site -maxdepth 3 -type f -print
             exit 1
           fi
 
-          echo "تم تجهيز ملفات الموقع:"
+          echo "تم تجهيز الموقع:"
           find site -maxdepth 3 -type f -print
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload Pages artifact
+      - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages
           path: site
-          retention-days: 1
 
-      - name: Deploy to GitHub Pages
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          artifact_name: github-pages
-          
+        
