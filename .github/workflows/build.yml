@@ -26,6 +26,17 @@ jobs:
           mkdir -p site
           unzip -o THE-LAST-SURVIVOR-READY-TO-PUBLISH.zip -d site
 
+          if [ ! -f site/index.html ]; then
+            INDEX_FILE=$(find site -name index.html -type f | head -n 1)
+
+            if [ -z "$INDEX_FILE" ]; then
+              echo "ERROR: index.html not found"
+              exit 1
+            fi
+
+            cp "$INDEX_FILE" site/index.html
+          fi
+
       - name: Install Three.js
         run: |
           mkdir -p threejs-temp
@@ -36,8 +47,15 @@ jobs:
 
       - name: Verify website files
         run: |
+          echo "Website root:"
+          ls -la site
+
           test -f site/index.html
           test -f site/three.min.js
+
+          echo "Three.js file size:"
+          wc -c site/three.min.js
+
           echo "Website files verified successfully"
 
       - name: Configure GitHub Pages
