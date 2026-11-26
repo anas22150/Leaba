@@ -1,0 +1,54 @@
+name: Build and Deploy THE LAST SURVIVOR
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Extract game ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="THE-LAST-SURVIVOR-PROGRAM-ONLY.zip"
+          if [[ ! -f "$ARCHIVE" ]]; then
+            echo "ERROR: $ARCHIVE was not found in the repository root."
+            exit 1
+          fi
+          mkdir -p _site
+          unzip -oq "$ARCHIVE" -d _site
+          if [[ ! -f _site/index.html ]]; then
+            echo "ERROR: index.html was not found inside the ZIP."
+            exit 1
+          fi
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
