@@ -28,8 +28,8 @@ jobs:
 
       - name: Install Three.js
         run: |
-          mkdir -p .threejs
-          cd .threejs
+          mkdir -p threejs-temp
+          cd threejs-temp
           npm init -y
           npm install three@0.128.0
           cp node_modules/three/build/three.min.js ../site/three.min.js
