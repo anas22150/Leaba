@@ -16,8 +16,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +33,6 @@ jobs:
 
           if [ ! -f "$ZIP_FILE" ]; then
             echo "::error::لم يتم العثور على $ZIP_FILE في جذر المستودع."
-            echo "الملفات الموجودة:"
             ls -la
             exit 1
           fi
@@ -39,7 +42,6 @@ jobs:
 
           if [ ! -f "site/index.html" ]; then
             echo "::error::لم يتم العثور على index.html بعد فك الضغط."
-            echo "محتويات مجلد site:"
             find site -maxdepth 3 -type f -print
             exit 1
           fi
@@ -58,9 +60,6 @@ jobs:
           name: github-pages
           path: site
           retention-days: 1
-
-      - name: Verify uploaded artifact step
-        run: echo "تم تنفيذ خطوة رفع artifact باسم github-pages."
 
       - name: Deploy to GitHub Pages
         id: deployment
